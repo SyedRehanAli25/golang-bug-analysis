@@ -2,17 +2,14 @@ pipeline {
     agent any
 
     environment {
-        // SonarQube server name as configured in Jenkins
         SONARQUBE_SERVER = 'SonarQube'
-        // SonarQube project key and name
         SONAR_PROJECT_KEY = 'golang-bug-analysis'
         SONAR_PROJECT_NAME = 'GoLang Bug Analysis'
-        // Go binary path (if required)
         PATH = "${env.PATH}"
     }
 
     tools {
-        go 'Go-1.21' // Name of Go installation in Jenkins
+        go 'Go-1.21' // Go installation in Jenkins
     }
 
     stages {
@@ -39,7 +36,6 @@ pipeline {
         stage('Static Code Analysis (Optional)') {
             steps {
                 sh 'golangci-lint run ./... || true'
-                // '|| true' prevents pipeline failure if linter finds issues, optional
             }
         }
 
@@ -62,6 +58,18 @@ pipeline {
             }
         }
 
+        stage('OWASP Security Scan (Optional)') {
+            steps {
+                // GoSec - static code analysis
+                sh 'gosec ./... || true'
+                
+                // Dependency-Check - scan dependencies for vulnerabilities
+                sh 'dependency-check.sh --project "GoLang Bug Analysis" --scan ./ --format HTML --out reports || true'
+                
+                archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
+            }
+        }
+
         stage('Quality Gate') {
             steps {
                 timeout(time: 5, unit: 'MINUTES') {
@@ -76,7 +84,7 @@ pipeline {
             echo "Pipeline completed successfully. Code passed SonarQube Quality Gate."
         }
         failure {
-            echo "Pipeline failed. Check SonarQube dashboard for issues."
+            echo "Pipeline failed. Check SonarQube & OWASP dashboards for issues."
         }
     }
 }
